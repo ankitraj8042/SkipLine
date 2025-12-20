@@ -4,6 +4,7 @@ import '../styles/QRScanner.css';
 
 function QRScanner() {
   const [scanning, setScanning] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
@@ -120,22 +121,49 @@ function QRScanner() {
 
     setError('');
     setSuccess('');
+    setUploading(true);
 
     try {
+      // Create a temporary element for scanning
+      const tempDiv = document.createElement('div');
+      tempDiv.id = 'qr-file-reader-temp';
+      tempDiv.style.display = 'none';
+      document.body.appendChild(tempDiv);
+
       const { Html5Qrcode } = await import('html5-qrcode');
-      const html5QrCode = new Html5Qrcode('qr-file-reader');
+      const html5QrCode = new Html5Qrcode(tempDiv.id);
       
+      // Scan the file with show image enabled
       const decodedText = await html5QrCode.scanFile(file, true);
+      
+      // Clean up
+      html5QrCode.clear().catch(() => {});
+      document.body.removeChild(tempDiv);
+
       const queueId = extractQueueId(decodedText);
 
       if (queueId) {
         handleQRSuccess(queueId);
       } else {
         setError('Invalid QR code image. Please upload a valid queue QR code.');
+        setUploading(false);
       }
     } catch (err) {
       console.error('QR scan from file failed:', err);
-      setError('Could not read QR code from image. Please try another image.');
+      
+      // Clean up temp element if it exists
+      const tempDiv = document.getElementById('qr-file-reader-temp');
+      if (tempDiv) {
+        document.body.removeChild(tempDiv);
+      }
+
+      // More descriptive error message
+      if (err.message && err.message.includes('QR code')) {
+        setError('No QR code found in image. Please upload a clear QR code image.');
+      } else {
+        setError('Could not read QR code from image. Ensure the image is clear and in focus.');
+      }
+      setUploading(false);
     }
 
     // Reset file input
@@ -158,6 +186,7 @@ function QRScanner() {
 
         {error && <div className="error-message">{error}</div>}
         {success && <div className="success-message">{success}</div>}
+        {uploading && <div className="info-message">📤 Processing QR image...</div>}
 
         {!scanning ? (
           <div className="scanner-actions">
@@ -170,8 +199,8 @@ function QRScanner() {
             </div>
 
             <div className="upload-section">
-              <label htmlFor="qr-upload" className="btn btn-secondary btn-large">
-                📁 Upload QR Image
+              <label htmlFor="qr-upload" className="btn btn-secondary btn-large" style={{ opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto' }}>
+                {uploading ? '⏳ Processing...' : '📁 Upload QR Image'}
               </label>
               <input
                 id="qr-upload"
@@ -179,9 +208,9 @@ function QRScanner() {
                 type="file"
                 accept="image/*"
                 onChange={handleFileUpload}
+                disabled={uploading}
                 style={{ display: 'none' }}
               />
-              <div id="qr-file-reader" style={{ display: 'none' }}></div>
             </div>
 
             <div className="divider">
