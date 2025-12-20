@@ -2,6 +2,53 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
+// Configure axios to include auth token
+axios.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Authentication API calls
+export const authAPI = {
+  // User register
+  userRegister: async (userData) => {
+    const response = await axios.post(`${API_URL}/users/register`, userData);
+    return response.data;
+  },
+
+  // User login
+  userLogin: async (email, password) => {
+    const response = await axios.post(`${API_URL}/users/login`, { email, password });
+    return response.data;
+  },
+
+  // Admin register
+  adminRegister: async (userData) => {
+    const response = await axios.post(`${API_URL}/users/admin/register`, userData);
+    return response.data;
+  },
+
+  // Admin login
+  adminLogin: async (email, password) => {
+    const response = await axios.post(`${API_URL}/users/admin/login`, { email, password });
+    return response.data;
+  },
+
+  // Get profile
+  getProfile: async (id) => {
+    const response = await axios.get(`${API_URL}/users/profile/${id}`);
+    return response.data;
+  }
+};
+
 // Queue API calls
 export const queueAPI = {
   // Get all queues
@@ -89,26 +136,17 @@ export const adminAPI = {
   getQueueStats: async (id) => {
     const response = await axios.get(`${API_URL}/admin/queues/${id}/stats`);
     return response.data;
+  },
+
+  // Get QR code
+  getQRCode: async (id) => {
+    const response = await axios.get(`${API_URL}/admin/queues/${id}/qrcode`);
+    return response.data;
   }
 };
 
-// User API calls
-export const userAPI = {
-  // Register
-  register: async (userData) => {
-    const response = await axios.post(`${API_URL}/users/register`, userData);
-    return response.data;
-  },
-
-  // Login
-  login: async (credentials) => {
-    const response = await axios.post(`${API_URL}/users/login`, credentials);
-    return response.data;
-  },
-
-  // Get profile
-  getProfile: async (id) => {
-    const response = await axios.get(`${API_URL}/users/profile/${id}`);
-    return response.data;
-  }
+export default {
+  authAPI,
+  queueAPI,
+  adminAPI
 };

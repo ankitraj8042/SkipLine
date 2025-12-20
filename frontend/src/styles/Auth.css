@@ -1,0 +1,88 @@
+/* Authentication Pages - Premium Design */
+.auth-page {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 480px;
+}
+
+.auth-card {
+  background: white;
+  border-radius: var(--radius-2xl);
+  padding: 3rem;
+  box-shadow: var(--shadow-2xl);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.auth-header h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.auth-header p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
+.auth-form {
+  margin-bottom: 2rem;
+}
+
+.auth-footer {
+  text-align: center;
+  padding-top: 2rem;
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.auth-footer p {
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+.auth-footer a {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.auth-footer a:hover {
+  color: var(--color-primary-dark);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.back-link:hover {
+  color: var(--color-primary);
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 2rem 1.5rem;
+  }
+  
+  .auth-header h1 {
+    font-size: 1.75rem;
+  }
+}

@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { queueAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import '../styles/JoinQueue.css';
 
 function JoinQueue() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [queue, setQueue] = useState(null);
-  const [formData, setFormData] = useState({
-    userName: '',
-    userPhone: '',
-    userEmail: '',
-    notes: ''
-  });
+  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -33,20 +30,16 @@ function JoinQueue() {
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.userName || !formData.userPhone) {
-      setError('Name and phone number are required');
-      return;
-    }
+    // Use logged-in user's details automatically
+    const formData = {
+      userName: user.name,
+      userPhone: user.phone,
+      userEmail: user.email,
+      notes: notes
+    };
 
     setSubmitting(true);
     setError('');
@@ -57,11 +50,11 @@ function JoinQueue() {
       localStorage.setItem('currentQueueEntry', JSON.stringify({
         queueId: id,
         entryId: result.entry._id,
-        phone: formData.userPhone,
+        phone: user.phone,
         queueName: result.queueName
       }));
       
-      navigate('/my-queue');
+      navigate('/user/my-queue');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to join queue. Please try again.');
     } finally {
@@ -70,83 +63,114 @@ function JoinQueue() {
   };
 
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Loading queue details...</p>
+      </div>
+    );
   }
 
   if (!queue) {
-    return <div className="error-message">Queue not found</div>;
+    return (
+      <div className="join-queue-page">
+        <div className="join-queue-container">
+          <div className="alert alert-error">Queue not found</div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="join-queue-container">
-      <div className="join-queue-card">
-        <h1>Join Queue</h1>
-        <div className="queue-name-display">
-          <h2>{queue.name}</h2>
-          <p>{queue.description}</p>
+    <div className="join-queue-page">
+      <div className="join-queue-container">
+        <div className="join-queue-card">
+          <div className="card-header">
+            <h1>Join Queue</h1>
+            <div className="queue-info-banner">
+              <h2>{queue.name}</h2>
+              <p>{queue.description}</p>
+              <div className="queue-meta">
+                <span className="meta-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                  Max Capacity: {queue.maxCapacity}
+                </span>
+                <span className="meta-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  ~{queue.estimatedTimePerPerson} min per person
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="alert alert-error">
+              {error}
+            </div>
+          )}
+
+          <div className="user-details-preview">
+            <h3>Your Information</h3>
+            <p className="info-subtitle">This information will be used for your queue entry</p>
+            <div className="details-grid">
+              <div className="detail-item">
+                <span className="detail-label">Name</span>
+                <span className="detail-value">{user.name}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Phone</span>
+                <span className="detail-value">{user.phone}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Email</span>
+                <span className="detail-value">{user.email}</span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="join-form">
+            <div className="form-group">
+              <label htmlFor="notes">Additional Notes (Optional)</label>
+              <textarea
+                id="notes"
+                name="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any special requirements or notes..."
+                rows="3"
+              ></textarea>
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn btn-primary btn-full"
+              disabled={submitting}
+            >
+              {submitting ? (
+                <>
+                  <div className="spinner-small"></div>
+                  Joining Queue...
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                  Join Queue
+                </>
+              )}
+            </button>
+          </form>
         </div>
-
-        {error && <div className="error-message">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="join-form">
-          <div className="form-group">
-            <label htmlFor="userName">Full Name *</label>
-            <input
-              type="text"
-              id="userName"
-              name="userName"
-              value={formData.userName}
-              onChange={handleChange}
-              placeholder="Enter your full name"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="userPhone">Phone Number *</label>
-            <input
-              type="tel"
-              id="userPhone"
-              name="userPhone"
-              value={formData.userPhone}
-              onChange={handleChange}
-              placeholder="Enter your phone number"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="userEmail">Email (Optional)</label>
-            <input
-              type="email"
-              id="userEmail"
-              name="userEmail"
-              value={formData.userEmail}
-              onChange={handleChange}
-              placeholder="Enter your email"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="notes">Additional Notes (Optional)</label>
-            <textarea
-              id="notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              placeholder="Any special requirements or notes"
-              rows="3"
-            ></textarea>
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary btn-large"
-            disabled={submitting}
-          >
-            {submitting ? 'Joining...' : 'Join Queue'}
-          </button>
-        </form>
       </div>
     </div>
   );

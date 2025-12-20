@@ -24,6 +24,71 @@
   margin: 0;
 }
 
+/* Queue ID Display */
+.queue-id-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 8px;
+  border-left: 4px solid #6366f1;
+  width: fit-content;
+}
+
+.queue-id-label {
+  font-size: 0.875rem;
+  color: #6c757d;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.queue-id-text {
+  font-size: 1rem;
+  color: #212529;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  background: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.copy-id-btn {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 0.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.copy-id-btn:hover {
+  background: #6366f1;
+  border-color: #6366f1;
+  transform: scale(1.05);
+}
+
+.copy-id-btn:hover svg {
+  stroke: white;
+}
+
+.copy-id-btn:active {
+  transform: scale(0.95);
+}
+
+.copy-id-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: #6c757d;
+  transition: stroke 0.2s ease;
+}
+
 .header-actions {
   display: flex;
   gap: 10px;

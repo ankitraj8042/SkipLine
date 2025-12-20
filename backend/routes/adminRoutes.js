@@ -3,6 +3,11 @@ const router = express.Router();
 const Queue = require('../models/Queue');
 const QueueEntry = require('../models/QueueEntry');
 const { generateQRCode, generateQueueJoinURL } = require('../utils/qrCodeGenerator');
+const { protect, admin } = require('../middleware/authMiddleware');
+
+// Apply authentication and admin middleware to all routes
+router.use(protect);
+router.use(admin);
 
 // Create a new queue (Admin/Organizer)
 router.post('/queues', async (req, res) => {

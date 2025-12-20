@@ -139,6 +139,23 @@ function ManageQueue() {
         <div>
           <h1>{queue.name}</h1>
           <p>{queue.description}</p>
+          <div className="queue-id-container">
+            <span className="queue-id-label">Queue ID:</span>
+            <span className="queue-id-text">{id}</span>
+            <button 
+              className="copy-id-btn"
+              onClick={() => {
+                navigator.clipboard.writeText(id);
+                alert('Queue ID copied to clipboard!');
+              }}
+              title="Copy Queue ID"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+          </div>
         </div>
         <div className="header-actions">
           <button 
@@ -165,51 +182,9 @@ function ManageQueue() {
           <div className="qr-code-display">
             <img src={queue.qrCode} alt="Queue QR Code" className="qr-code-image" />
           </div>
-          <div className="qr-upload">
-            <h4>Upload QR Image (optional)</h4>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={async (e) => {
-                const file = e.target.files && e.target.files[0];
-                if (!file) return;
-                // Preview
-                const reader = new FileReader();
-                reader.onload = async (ev) => {
-                  const dataUrl = ev.target.result;
-                  setUploadPreview(dataUrl);
-                  setUploading(true);
-                  try {
-                    const res = await adminAPI.updateQueue(id, { qrCode: dataUrl });
-                    // update local queue
-                    setQueue(res.queue || { ...queue, qrCode: dataUrl });
-                    alert('QR image uploaded and saved successfully');
-                  } catch (err) {
-                    console.error('Upload failed', err);
-                    alert('Failed to upload QR image');
-                  } finally {
-                    setUploading(false);
-                  }
-                };
-                reader.readAsDataURL(file);
-              }}
-            />
-
-            {uploadPreview && (
-              <div className="upload-preview">
-                <p>Preview:</p>
-                <img src={uploadPreview} alt="Upload Preview" style={{ maxWidth: 200, border: '1px solid #ccc', padding: 6 }} />
-              </div>
-            )}
-
-            {uploading && <p>Uploading...</p>}
-          </div>
           <div className="qr-actions">
             <button onClick={handleDownloadQR} className="btn btn-primary">
               💾 Download QR Code
-            </button>
-            <button onClick={handlePrintQR} className="btn btn-secondary">
-              🖨️ Print QR Code
             </button>
             <button 
               onClick={() => {

@@ -7,6 +7,7 @@ function QRScanner() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [manualQueueId, setManualQueueId] = useState('');
   const navigate = useNavigate();
   const scannerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -172,8 +173,13 @@ function QRScanner() {
     }
   };
 
-  const handleManualEntry = () => {
-    navigate('/queues');
+  const handleManualEntry = (e) => {
+    e.preventDefault();
+    if (manualQueueId.trim()) {
+      navigate(`/queue/${manualQueueId.trim()}/join`);
+    } else {
+      setError('Please enter a valid Queue ID');
+    }
   };
 
   return (
@@ -217,16 +223,29 @@ function QRScanner() {
               <span>OR</span>
             </div>
 
-            <button onClick={handleManualEntry} className="btn btn-secondary btn-large">
-              🔍 Browse Queues Manually
-            </button>
+            <form onSubmit={handleManualEntry} className="manual-entry-form">
+              <div className="form-group">
+                <label htmlFor="queueId">Enter Queue ID</label>
+                <input
+                  type="text"
+                  id="queueId"
+                  value={manualQueueId}
+                  onChange={(e) => setManualQueueId(e.target.value)}
+                  placeholder="Enter queue ID to join"
+                  className="form-input"
+                />
+              </div>
+              <button type="submit" className="btn btn-secondary btn-large">
+                🔗 Join with Queue ID
+              </button>
+            </form>
 
             <div className="info-box">
               <h3>How to use:</h3>
               <ul>
                 <li><strong>Camera:</strong> Click "Start Camera Scanner" and point at QR code</li>
                 <li><strong>Image:</strong> Click "Upload QR Image" and select a QR code image</li>
-                <li><strong>Manual:</strong> Click "Browse Queues" to search manually</li>
+                <li><strong>Queue ID:</strong> Enter the queue ID provided by the organizer</li>
               </ul>
             </div>
           </div>
