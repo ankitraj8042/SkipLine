@@ -1,65 +1,75 @@
 import React, { useState, useEffect, useRef } from 'react';
-// Dynamically import Html5QrcodeScanner inside useEffect to avoid import-time DOM/window issues
 import { useNavigate } from 'react-router-dom';
 import '../styles/QRScanner.css';
 
 function QRScanner() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
-
-  const startScanner = () => {
-    setScanning(true);
-    setError('');
-  };
-
   const scannerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  const onScanSuccess = (decodedText, decodedResult) => {
+  const extractQueueId = (decodedText) => {
     try {
       const url = new URL(decodedText);
       const pathParts = url.pathname.split('/');
       const queueIndex = pathParts.indexOf('queue');
 
       if (queueIndex !== -1 && pathParts[queueIndex + 1]) {
-        const queueId = pathParts[queueIndex + 1];
-
-        if (scannerRef.current && scannerRef.current.clear) {
-          scannerRef.current.clear().catch(() => {});
-        }
-
-        navigate(`/queue/${queueId}/join`);
-      } else {
-        setError('Invalid QR code. Please scan a valid queue QR code.');
+        return pathParts[queueIndex + 1];
       }
+      return null;
     } catch (err) {
-      setError('Invalid QR code format.');
+      return null;
     }
   };
 
-  const onScanFailure = (errorMsg) => {
-    // no-op or could show a subtle notification
+  const handleQRSuccess = (queueId) => {
+    setSuccess('QR Code detected! Redirecting...');
+    setTimeout(() => {
+      navigate(`/queue/${queueId}/join`);
+    }, 500);
+  };
+
+  const onScanSuccess = (decodedText) => {
+    const queueId = extractQueueId(decodedText);
+    
+    if (queueId) {
+      if (scannerRef.current && scannerRef.current.clear) {
+        scannerRef.current.clear().catch(() => {});
+      }
+      handleQRSuccess(queueId);
+    } else {
+      setError('Invalid QR code. Please scan a valid queue QR code.');
+    }
+  };
+
+  const onScanFailure = () => {
+    // Ignore scan failures
   };
 
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
+
     if (scanning) {
-      // Dynamically import the library and create the scanner after the DOM element is present
-      let cancelled = false;
       const setupScanner = async () => {
         try {
-          const module = await import('html5-qrcode');
+          const { Html5QrcodeScanner } = await import('html5-qrcode');
+          
           if (cancelled) return;
-          const Html5QrcodeScanner = module.Html5QrcodeScanner;
 
-          // Ensure the DOM element exists (react should have rendered it)
+          // Wait for DOM element
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           const container = document.getElementById('qr-reader');
           if (!container) {
-            // If element is not present yet, wait a short moment and retry once
-            await new Promise(r => setTimeout(r, 100));
+            setError('Scanner container not found. Please try again.');
+            setScanning(false);
+            return;
           }
 
-          const html5QrcodeScanner = new Html5QrcodeScanner(
+          const scanner = new Html5QrcodeScanner(
             'qr-reader',
             {
               fps: 10,
@@ -69,25 +79,32 @@ function QRScanner() {
             false
           );
 
-          scannerRef.current = html5QrcodeScanner;
-          html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+          scannerRef.current = scanner;
+          scanner.render(onScanSuccess, onScanFailure);
         } catch (err) {
-          console.error('Failed to initialize QR scanner', err);
+          console.error('Scanner initialization failed:', err);
           setError('Failed to initialize camera scanner. Please try again.');
+          setScanning(false);
         }
       };
 
       setupScanner();
-    }
 
-    return () => {
-      mounted = false;
-      if (scannerRef.current && scannerRef.current.clear) {
-        scannerRef.current.clear().catch(() => {});
-        scannerRef.current = null;
-      }
-    };
+      return () => {
+        cancelled = true;
+        if (scannerRef.current && scannerRef.current.clear) {
+          scannerRef.current.clear().catch(() => {});
+          scannerRef.current = null;
+        }
+      };
+    }
   }, [scanning]);
+
+  const startScanner = () => {
+    setScanning(true);
+    setError('');
+    setSuccess('');
+  };
 
   const stopScanner = () => {
     if (scannerRef.current && scannerRef.current.clear) {
@@ -95,6 +112,36 @@ function QRScanner() {
       scannerRef.current = null;
     }
     setScanning(false);
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError('');
+    setSuccess('');
+
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      const html5QrCode = new Html5Qrcode('qr-file-reader');
+      
+      const decodedText = await html5QrCode.scanFile(file, true);
+      const queueId = extractQueueId(decodedText);
+
+      if (queueId) {
+        handleQRSuccess(queueId);
+      } else {
+        setError('Invalid QR code image. Please upload a valid queue QR code.');
+      }
+    } catch (err) {
+      console.error('QR scan from file failed:', err);
+      setError('Could not read QR code from image. Please try another image.');
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleManualEntry = () => {
@@ -106,10 +153,11 @@ function QRScanner() {
       <div className="qr-scanner-card">
         <h1>Scan Queue QR Code</h1>
         <p className="scanner-subtitle">
-          Scan the QR code provided by the organizer to quickly join the queue
+          Scan or upload a QR code to quickly join the queue
         </p>
 
         {error && <div className="error-message">{error}</div>}
+        {success && <div className="success-message">{success}</div>}
 
         {!scanning ? (
           <div className="scanner-actions">
@@ -121,28 +169,43 @@ function QRScanner() {
               <span>OR</span>
             </div>
 
+            <div className="upload-section">
+              <label htmlFor="qr-upload" className="btn btn-secondary btn-large">
+                📁 Upload QR Image
+              </label>
+              <input
+                id="qr-upload"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+              />
+              <div id="qr-file-reader" style={{ display: 'none' }}></div>
+            </div>
+
+            <div className="divider">
+              <span>OR</span>
+            </div>
+
             <button onClick={handleManualEntry} className="btn btn-secondary btn-large">
               🔍 Browse Queues Manually
             </button>
 
             <div className="info-box">
               <h3>How to use:</h3>
-              <ol>
-                <li>Click "Start Camera Scanner"</li>
-                <li>Allow camera permissions</li>
-                <li>Point your camera at the QR code</li>
-                <li>Wait for automatic detection</li>
-                <li>You'll be redirected to join the queue</li>
-              </ol>
+              <ul>
+                <li><strong>Camera:</strong> Click "Start Camera Scanner" and point at QR code</li>
+                <li><strong>Image:</strong> Click "Upload QR Image" and select a QR code image</li>
+                <li><strong>Manual:</strong> Click "Browse Queues" to search manually</li>
+              </ul>
             </div>
           </div>
         ) : (
           <div className="scanner-wrapper">
             <div id="qr-reader"></div>
             <button 
-              onClick={() => {
-                stopScanner();
-              }} 
+              onClick={stopScanner} 
               className="btn btn-danger"
               style={{ marginTop: '20px' }}
             >
