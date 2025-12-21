@@ -1,3 +1,8 @@
+// ============================================
+// FILE: backend/routes/adminRoutes.js
+// COMPLETE VERSION WITH DEBUG ENDPOINT
+// ============================================
+
 const express = require('express');
 const router = express.Router();
 const Queue = require('../models/Queue');
@@ -9,7 +14,7 @@ const { protect, admin } = require('../middleware/authMiddleware');
 router.use(protect);
 router.use(admin);
 
-// Create a new queue (Admin/Organizer)
+// Create a new queue
 router.post('/queues', async (req, res) => {
   try {
     const {
@@ -32,20 +37,35 @@ router.post('/queues', async (req, res) => {
       organizerEmail
     });
 
-    // Save queue first to get the ID
     await queue.save();
+    console.log('✅ Queue created with ID:', queue._id);
 
-    // Generate QR code for the queue
     const joinURL = generateQueueJoinURL(queue._id);
-    const qrCodeDataURL = await generateQRCode(joinURL);
+    console.log('✅ Generated join URL:', joinURL);
     
-    // Update queue with QR code
+    const qrCodeDataURL = await generateQRCode(joinURL);
+    console.log('✅ QR code generated, length:', qrCodeDataURL.length);
+    console.log('✅ QR code preview:', qrCodeDataURL.substring(0, 100));
+    
     queue.qrCode = qrCodeDataURL;
     await queue.save();
+    console.log('✅ QR code saved to database');
 
-    res.status(201).json({ message: 'Queue created successfully', queue });
+    res.status(201).json({ 
+      message: 'Queue created successfully', 
+      queue,
+      joinURL,
+      debug: {
+        qrCodeLength: qrCodeDataURL.length,
+        qrCodePreview: qrCodeDataURL.substring(0, 100)
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('❌ Error creating queue:', error);
+    res.status(500).json({ 
+      message: 'Failed to create queue',
+      error: error.message 
+    });
   }
 });
 
@@ -64,7 +84,11 @@ router.put('/queues/:id', async (req, res) => {
 
     res.json({ message: 'Queue updated successfully', queue });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error updating queue:', error);
+    res.status(500).json({ 
+      message: 'Failed to update queue',
+      error: error.message 
+    });
   }
 });
 
@@ -82,7 +106,11 @@ router.delete('/queues/:id', async (req, res) => {
 
     res.json({ message: 'Queue deactivated successfully' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error deactivating queue:', error);
+    res.status(500).json({ 
+      message: 'Failed to deactivate queue',
+      error: error.message 
+    });
   }
 });
 
@@ -94,7 +122,11 @@ router.get('/queues/:id/entries', async (req, res) => {
 
     res.json(entries);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching entries:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch entries',
+      error: error.message 
+    });
   }
 });
 
@@ -107,7 +139,6 @@ router.post('/queues/:id/call-next', async (req, res) => {
       return res.status(404).json({ message: 'Queue not found' });
     }
 
-    // Find the next waiting entry
     const nextEntry = await QueueEntry.findOne({
       queueId: req.params.id,
       status: 'waiting',
@@ -130,7 +161,11 @@ router.post('/queues/:id/call-next', async (req, res) => {
       entry: nextEntry
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error calling next person:', error);
+    res.status(500).json({ 
+      message: 'Failed to call next person',
+      error: error.message 
+    });
   }
 });
 
@@ -147,14 +182,17 @@ router.post('/entries/:id/served', async (req, res) => {
     entry.servedAt = new Date();
     await entry.save();
 
-    // Update queue total served count
     const queue = await Queue.findById(entry.queueId);
     queue.totalServed += 1;
     await queue.save();
 
     res.json({ message: 'Entry marked as served', entry });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error marking entry as served:', error);
+    res.status(500).json({ 
+      message: 'Failed to mark entry as served',
+      error: error.message 
+    });
   }
 });
 
@@ -172,7 +210,11 @@ router.post('/entries/:id/missed', async (req, res) => {
 
     res.json({ message: 'Entry marked as missed', entry });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error marking entry as missed:', error);
+    res.status(500).json({ 
+      message: 'Failed to mark entry as missed',
+      error: error.message 
+    });
   }
 });
 
@@ -191,7 +233,11 @@ router.post('/entries/:id/skip-to', async (req, res) => {
 
     res.json({ message: 'Skipped to entry', entry });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error skipping to entry:', error);
+    res.status(500).json({ 
+      message: 'Failed to skip to entry',
+      error: error.message 
+    });
   }
 });
 
@@ -204,16 +250,60 @@ router.get('/queues/:id/qrcode', async (req, res) => {
       return res.status(404).json({ message: 'Queue not found' });
     }
 
-    // If QR code doesn't exist, generate it
-    if (!queue.qrCode) {
-      const joinURL = generateQueueJoinURL(queue._id);
-      const qrCodeDataURL = await generateQRCode(joinURL);
-      queue.qrCode = qrCodeDataURL;
-      await queue.save();
+    const joinURL = generateQueueJoinURL(queue._id);
+    console.log('Regenerating QR for URL:', joinURL);
+
+    // Always regenerate with new black/white settings
+    const qrCodeDataURL = await generateQRCode(joinURL);
+    console.log('New QR generated, length:', qrCodeDataURL.length);
+    
+    // Update in database
+    queue.qrCode = qrCodeDataURL;
+    await queue.save();
+    console.log('✅ QR code updated for queue:', queue._id);
+
+    res.json({ 
+      qrCode: queue.qrCode, 
+      joinURL: joinURL,
+      queueId: queue._id.toString()
+    });
+  } catch (error) {
+    console.error('Error regenerating QR code:', error);
+    res.status(500).json({ 
+      message: 'Failed to regenerate QR code',
+      error: error.message 
+    });
+  }
+});
+
+// 🔍 DEBUG ENDPOINT - Test QR code data
+router.get('/test-qr/:id', async (req, res) => {
+  try {
+    const queue = await Queue.findById(req.params.id);
+    
+    if (!queue) {
+      return res.status(404).json({ message: 'Queue not found' });
     }
 
-    res.json({ qrCode: queue.qrCode, joinURL: generateQueueJoinURL(queue._id) });
+    console.log('=== QR CODE DEBUG ===');
+    console.log('Queue ID:', queue._id);
+    console.log('Queue Name:', queue.name);
+    console.log('QR Code exists:', !!queue.qrCode);
+    console.log('QR Code length:', queue.qrCode ? queue.qrCode.length : 0);
+    console.log('QR Code starts with:', queue.qrCode ? queue.qrCode.substring(0, 50) : 'N/A');
+    console.log('Expected URL:', generateQueueJoinURL(queue._id));
+    
+    res.json({
+      queueId: queue._id,
+      queueName: queue.name,
+      hasQRCode: !!queue.qrCode,
+      qrCodeLength: queue.qrCode ? queue.qrCode.length : 0,
+      qrCodePreview: queue.qrCode ? queue.qrCode.substring(0, 100) : null,
+      expectedJoinURL: generateQueueJoinURL(queue._id),
+      isColorCorrect: queue.qrCode ? queue.qrCode.includes('data:image/png') : false
+    });
   } catch (error) {
+    console.error('Error in debug endpoint:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -258,7 +348,42 @@ router.get('/queues/:id/stats', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch statistics',
+      error: error.message 
+    });
+  }
+});
+
+// Download QR code as PNG file
+router.get('/queues/:id/qrcode/download', async (req, res) => {
+  try {
+    const queue = await Queue.findById(req.params.id);
+    
+    if (!queue) {
+      return res.status(404).json({ message: 'Queue not found' });
+    }
+
+    if (queue.qrCode) {
+      const base64Data = queue.qrCode.replace(/^data:image\/png;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      res.set({
+        'Content-Type': 'image/png',
+        'Content-Disposition': `attachment; filename="queue-${queue._id}-qrcode.png"`
+      });
+      
+      res.send(buffer);
+    } else {
+      res.status(404).json({ message: 'QR code not found for this queue' });
+    }
+  } catch (error) {
+    console.error('Error downloading QR code:', error);
+    res.status(500).json({ 
+      message: 'Failed to download QR code',
+      error: error.message 
+    });
   }
 });
 

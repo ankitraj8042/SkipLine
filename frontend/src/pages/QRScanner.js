@@ -1,4 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+// ============================================
+// FILE: frontend/src/pages/QRScanner.js
+// FINAL WORKING VERSION
+// ============================================
+
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/QRScanner.css';
 
@@ -8,166 +13,209 @@ function QRScanner() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [manualQueueId, setManualQueueId] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
   const navigate = useNavigate();
-  const scannerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
+  // Extract queue ID from the scanned text
   const extractQueueId = (decodedText) => {
     try {
-      const url = new URL(decodedText);
-      const pathParts = url.pathname.split('/');
-      const queueIndex = pathParts.indexOf('queue');
-
-      if (queueIndex !== -1 && pathParts[queueIndex + 1]) {
-        return pathParts[queueIndex + 1];
+      console.log('🔍 Processing:', decodedText);
+      
+      // Method 1: Parse as URL
+      try {
+        const url = new URL(decodedText);
+        const pathParts = url.pathname.split('/').filter(part => part !== '');
+        const queueIndex = pathParts.indexOf('queue');
+        
+        if (queueIndex !== -1 && pathParts[queueIndex + 1]) {
+          const queueId = pathParts[queueIndex + 1];
+          console.log('✅ Extracted from URL:', queueId);
+          return queueId;
+        }
+      } catch (e) {
+        console.log('Not a URL, trying other methods...');
       }
+      
+      // Method 2: Direct MongoDB ID (24 hex characters)
+      if (/^[a-f0-9]{24}$/i.test(decodedText.trim())) {
+        console.log('✅ Direct ID match:', decodedText.trim());
+        return decodedText.trim();
+      }
+      
+      // Method 3: Find MongoDB ID pattern anywhere in text
+      const idMatch = decodedText.match(/[a-f0-9]{24}/i);
+      if (idMatch) {
+        console.log('✅ Found ID pattern:', idMatch[0]);
+        return idMatch[0];
+      }
+      
       return null;
     } catch (err) {
+      console.error('❌ Extraction error:', err);
       return null;
     }
   };
 
   const handleQRSuccess = (queueId) => {
-    setSuccess('QR Code detected! Redirecting...');
+    console.log('✅ Navigating to queue:', queueId);
+    setSuccess('✅ Success! Redirecting...');
+    
+    // Stop camera if running
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+    }
+    
     setTimeout(() => {
       navigate(`/queue/${queueId}/join`);
-    }, 500);
+    }, 800);
   };
 
-  const onScanSuccess = (decodedText) => {
-    const queueId = extractQueueId(decodedText);
-    
-    if (queueId) {
-      if (scannerRef.current && scannerRef.current.clear) {
-        scannerRef.current.clear().catch(() => {});
-      }
-      handleQRSuccess(queueId);
-    } else {
-      setError('Invalid QR code. Please scan a valid queue QR code.');
-    }
-  };
-
-  const onScanFailure = () => {
-    // Ignore scan failures
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (scanning) {
-      const setupScanner = async () => {
-        try {
-          const { Html5QrcodeScanner } = await import('html5-qrcode');
-          
-          if (cancelled) return;
-
-          // Wait for DOM element
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          const container = document.getElementById('qr-reader');
-          if (!container) {
-            setError('Scanner container not found. Please try again.');
-            setScanning(false);
-            return;
+  // CAMERA SCANNER using native browser APIs
+  const startCameraScanner = async () => {
+    try {
+      setError('');
+      setSuccess('');
+      setScanning(true);
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        
+        // Start scanning every 500ms
+        const scanInterval = setInterval(async () => {
+          if (canvasRef.current && videoRef.current) {
+            const canvas = canvasRef.current;
+            const video = videoRef.current;
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const { default: jsQR } = await import('jsqr');
+              const code = jsQR(imageData.data, imageData.width, imageData.height);
+              
+              if (code) {
+                clearInterval(scanInterval);
+                stream.getTracks().forEach(track => track.stop());
+                
+                const queueId = extractQueueId(code.data);
+                if (queueId) {
+                  handleQRSuccess(queueId);
+                } else {
+                  setError('Invalid QR code');
+                  setScanning(false);
+                }
+              }
+            } catch (e) {
+              // Continue scanning
+            }
           }
-
-          const scanner = new Html5QrcodeScanner(
-            'qr-reader',
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
-              aspectRatio: 1.0,
-            },
-            false
-          );
-
-          scannerRef.current = scanner;
-          scanner.render(onScanSuccess, onScanFailure);
-        } catch (err) {
-          console.error('Scanner initialization failed:', err);
-          setError('Failed to initialize camera scanner. Please try again.');
-          setScanning(false);
-        }
-      };
-
-      setupScanner();
-
-      return () => {
-        cancelled = true;
-        if (scannerRef.current && scannerRef.current.clear) {
-          scannerRef.current.clear().catch(() => {});
-          scannerRef.current = null;
-        }
-      };
+        }, 500);
+        
+        // Store interval for cleanup
+        videoRef.current.scanInterval = scanInterval;
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      setError('Could not access camera. Please check permissions.');
+      setScanning(false);
     }
-  }, [scanning]);
-
-  const startScanner = () => {
-    setScanning(true);
-    setError('');
-    setSuccess('');
   };
 
-  const stopScanner = () => {
-    if (scannerRef.current && scannerRef.current.clear) {
-      scannerRef.current.clear().catch(() => {});
-      scannerRef.current = null;
+  const stopCameraScanner = () => {
+    if (videoRef.current) {
+      if (videoRef.current.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      }
+      if (videoRef.current.scanInterval) {
+        clearInterval(videoRef.current.scanInterval);
+      }
     }
     setScanning(false);
   };
 
+  // FILE UPLOAD with jsQR library
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('📤 File:', file.name, file.type, file.size);
+
     setError('');
     setSuccess('');
     setUploading(true);
+    setDebugInfo('Reading image...');
 
     try {
-      // Create a temporary element for scanning
-      const tempDiv = document.createElement('div');
-      tempDiv.id = 'qr-file-reader-temp';
-      tempDiv.style.display = 'none';
-      document.body.appendChild(tempDiv);
-
-      const { Html5Qrcode } = await import('html5-qrcode');
-      const html5QrCode = new Html5Qrcode(tempDiv.id);
+      // Load image
+      const img = new Image();
+      const imageUrl = URL.createObjectURL(file);
       
-      // Scan the file with show image enabled
-      const decodedText = await html5QrCode.scanFile(file, true);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
       
-      // Clean up
-      html5QrCode.clear().catch(() => {});
-      document.body.removeChild(tempDiv);
-
-      const queueId = extractQueueId(decodedText);
-
-      if (queueId) {
-        handleQRSuccess(queueId);
+      console.log('📐 Image size:', img.width, 'x', img.height);
+      setDebugInfo('Scanning QR code...');
+      
+      // Draw to canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      
+      // Get image data
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Scan with jsQR
+      const { default: jsQR } = await import('jsqr');
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+      
+      URL.revokeObjectURL(imageUrl);
+      
+      if (code) {
+        console.log('✅ Decoded:', code.data);
+        setDebugInfo(`Found: ${code.data.substring(0, 50)}...`);
+        
+        const queueId = extractQueueId(code.data);
+        
+        if (queueId) {
+          handleQRSuccess(queueId);
+        } else {
+          setError('❌ Could not extract Queue ID from QR code');
+          setDebugInfo(`Data: ${code.data}`);
+          setUploading(false);
+        }
       } else {
-        setError('Invalid QR code image. Please upload a valid queue QR code.');
+        console.error('❌ No QR code found in image');
+        setError('❌ No QR code detected. Please try:\n• Better lighting\n• Clearer image\n• Getting closer to QR code\n• Or use manual entry below');
+        setDebugInfo('No QR code found');
         setUploading(false);
       }
     } catch (err) {
-      console.error('QR scan from file failed:', err);
-      
-      // Clean up temp element if it exists
-      const tempDiv = document.getElementById('qr-file-reader-temp');
-      if (tempDiv) {
-        document.body.removeChild(tempDiv);
-      }
-
-      // More descriptive error message
-      if (err.message && err.message.includes('QR code')) {
-        setError('No QR code found in image. Please upload a clear QR code image.');
-      } else {
-        setError('Could not read QR code from image. Ensure the image is clear and in focus.');
-      }
+      console.error('❌ Scan error:', err);
+      setError('Failed to process image. Please try again.');
+      setDebugInfo('Processing failed');
       setUploading(false);
     }
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -175,8 +223,11 @@ function QRScanner() {
 
   const handleManualEntry = (e) => {
     e.preventDefault();
-    if (manualQueueId.trim()) {
-      navigate(`/queue/${manualQueueId.trim()}/join`);
+    const id = manualQueueId.trim();
+    
+    if (id) {
+      console.log('Manual entry:', id);
+      navigate(`/queue/${id}/join`);
     } else {
       setError('Please enter a valid Queue ID');
     }
@@ -190,13 +241,14 @@ function QRScanner() {
           Scan or upload a QR code to quickly join the queue
         </p>
 
-        {error && <div className="error-message">{error}</div>}
+        {error && <div className="error-message" style={{whiteSpace: 'pre-line'}}>{error}</div>}
         {success && <div className="success-message">{success}</div>}
-        {uploading && <div className="info-message">📤 Processing QR image...</div>}
+        {uploading && <div className="info-message">📤 Processing image...</div>}
+        {debugInfo && <div className="info-message" style={{fontSize: '0.85em', marginTop: '8px'}}>🔍 {debugInfo}</div>}
 
         {!scanning ? (
           <div className="scanner-actions">
-            <button onClick={startScanner} className="btn btn-primary btn-large">
+            <button onClick={startCameraScanner} className="btn btn-primary btn-large">
               📷 Start Camera Scanner
             </button>
             
@@ -205,7 +257,14 @@ function QRScanner() {
             </div>
 
             <div className="upload-section">
-              <label htmlFor="qr-upload" className="btn btn-secondary btn-large" style={{ opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto' }}>
+              <label 
+                htmlFor="qr-upload" 
+                className="btn btn-secondary btn-large" 
+                style={{ 
+                  opacity: uploading ? 0.6 : 1, 
+                  pointerEvents: uploading ? 'none' : 'auto' 
+                }}
+              >
                 {uploading ? '⏳ Processing...' : '📁 Upload QR Image'}
               </label>
               <input
@@ -225,15 +284,18 @@ function QRScanner() {
 
             <form onSubmit={handleManualEntry} className="manual-entry-form">
               <div className="form-group">
-                <label htmlFor="queueId">Enter Queue ID</label>
+                <label htmlFor="queueId">Enter Queue ID Manually</label>
                 <input
                   type="text"
                   id="queueId"
                   value={manualQueueId}
                   onChange={(e) => setManualQueueId(e.target.value)}
-                  placeholder="Enter queue ID to join"
+                  placeholder="69477b1824d1c46858519f32"
                   className="form-input"
                 />
+                <small style={{color: '#666', fontSize: '0.85em', marginTop: '5px', display: 'block'}}>
+                  Get the 24-character Queue ID from the organizer
+                </small>
               </div>
               <button type="submit" className="btn btn-secondary btn-large">
                 🔗 Join with Queue ID
@@ -241,19 +303,31 @@ function QRScanner() {
             </form>
 
             <div className="info-box">
-              <h3>How to use:</h3>
+              <h3>📖 How to use:</h3>
               <ul>
-                <li><strong>Camera:</strong> Click "Start Camera Scanner" and point at QR code</li>
-                <li><strong>Image:</strong> Click "Upload QR Image" and select a QR code image</li>
-                <li><strong>Queue ID:</strong> Enter the queue ID provided by the organizer</li>
+                <li><strong>Camera:</strong> Point your camera at the QR code</li>
+                <li><strong>Upload:</strong> Select a photo of the QR code</li>
+                <li><strong>Manual:</strong> Type/paste the Queue ID (24 characters)</li>
               </ul>
+              <p style={{marginTop: '12px', fontSize: '0.9em', color: '#666'}}>
+                💡 <strong>Tip:</strong> For best results, ensure good lighting and hold steady
+              </p>
             </div>
           </div>
         ) : (
           <div className="scanner-wrapper">
-            <div id="qr-reader"></div>
+            <video 
+              ref={videoRef} 
+              style={{
+                width: '100%', 
+                maxWidth: '500px', 
+                border: '2px solid #667eea',
+                borderRadius: '8px'
+              }}
+            />
+            <canvas ref={canvasRef} style={{display: 'none'}} />
             <button 
-              onClick={stopScanner} 
+              onClick={stopCameraScanner} 
               className="btn btn-danger"
               style={{ marginTop: '20px' }}
             >
