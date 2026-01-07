@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { adminAPI, queueAPI } from '../services/api';
+import { showSuccess, showError, showInfo } from '../utils/toast';
 import '../styles/ManageQueue.css';
 
 function ManageQueue() {
@@ -39,11 +40,14 @@ function ManageQueue() {
 
   const handleCallNext = async () => {
     try {
-      await adminAPI.callNext(id);
+      const result = await adminAPI.callNext(id);
       fetchQueueData();
-      alert('Next person called successfully!');
+      showSuccess(`Called ${result.entry.userName} (Position #${result.entry.position})`);
+      if (result.notificationSent) {
+        showInfo('Email notification sent to customer');
+      }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to call next person');
+      showError(err.response?.data?.message || 'Failed to call next person');
     }
   };
 
@@ -51,8 +55,9 @@ function ManageQueue() {
     try {
       await adminAPI.markServed(entryId);
       fetchQueueData();
+      showSuccess('Marked as served');
     } catch (err) {
-      alert('Failed to mark as served');
+      showError('Failed to mark as served');
     }
   };
 
@@ -60,8 +65,9 @@ function ManageQueue() {
     try {
       await adminAPI.markMissed(entryId);
       fetchQueueData();
+      showSuccess('Marked as missed');
     } catch (err) {
-      alert('Failed to mark as missed');
+      showError('Failed to mark as missed');
     }
   };
 
@@ -69,8 +75,9 @@ function ManageQueue() {
     try {
       await adminAPI.updateQueue(id, { isActive: !queue.isActive });
       fetchQueueData();
+      showSuccess(queue.isActive ? 'Queue deactivated' : 'Queue activated');
     } catch (err) {
-      alert('Failed to update queue status');
+      showError('Failed to update queue status');
     }
   };
 
@@ -146,7 +153,7 @@ function ManageQueue() {
               className="copy-id-btn"
               onClick={() => {
                 navigator.clipboard.writeText(id);
-                alert('Queue ID copied to clipboard!');
+                showSuccess('Queue ID copied to clipboard!');
               }}
               title="Copy Queue ID"
             >
@@ -189,7 +196,7 @@ function ManageQueue() {
             <button 
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/queue/${id}/join`);
-                alert('Queue link copied to clipboard!');
+                showSuccess('Queue link copied to clipboard!');
               }}
               className="btn btn-secondary"
             >

@@ -1,6 +1,6 @@
 // ============================================
 // FILE: backend/routes/adminRoutes.js
-// COMPLETE VERSION WITH DEBUG ENDPOINT
+// WITH NOTIFICATIONS AND VALIDATION
 // ============================================
 
 const express = require('express');
@@ -9,13 +9,42 @@ const Queue = require('../models/Queue');
 const QueueEntry = require('../models/QueueEntry');
 const { generateQRCode, generateQueueJoinURL } = require('../utils/qrCodeGenerator');
 const { protect, admin } = require('../middleware/authMiddleware');
+const { validateQueueCreation } = require('../middleware/validation');
+const { sendYourTurnEmail, sendTurnApproachingEmail } = require('../services/emailService');
 
 // Apply authentication and admin middleware to all routes
 router.use(protect);
 router.use(admin);
 
-// Create a new queue
-router.post('/queues', async (req, res) => {
+// Helper function to notify people ahead
+const notifyPeopleAhead = async (queueId, queueName, currentPosition, notifyCount = 3) => {
+  try {
+    // Find next few people in queue who should be notified
+    const upcomingEntries = await QueueEntry.find({
+      queueId,
+      status: 'waiting',
+      position: { $gt: currentPosition, $lte: currentPosition + notifyCount }
+    }).sort({ position: 1 });
+
+    for (const entry of upcomingEntries) {
+      const peopleAhead = entry.position - currentPosition - 1;
+      if (entry.userEmail && peopleAhead <= 2) {
+        sendTurnApproachingEmail(
+          entry.userEmail, 
+          entry.userName, 
+          queueName, 
+          entry.position, 
+          peopleAhead
+        ).catch(err => console.error('Notification failed:', err));
+      }
+    }
+  } catch (error) {
+    console.error('Error notifying people ahead:', error);
+  }
+};
+
+// Create a new queue (with validation)
+router.post('/queues', validateQueueCreation, async (req, res) => {
   try {
     const {
       name,
@@ -38,27 +67,18 @@ router.post('/queues', async (req, res) => {
     });
 
     await queue.save();
-    console.log('✅ Queue created with ID:', queue._id);
 
     const joinURL = generateQueueJoinURL(queue._id);
-    console.log('✅ Generated join URL:', joinURL);
     
     const qrCodeDataURL = await generateQRCode(joinURL);
-    console.log('✅ QR code generated, length:', qrCodeDataURL.length);
-    console.log('✅ QR code preview:', qrCodeDataURL.substring(0, 100));
     
     queue.qrCode = qrCodeDataURL;
     await queue.save();
-    console.log('✅ QR code saved to database');
 
     res.status(201).json({ 
       message: 'Queue created successfully', 
       queue,
-      joinURL,
-      debug: {
-        qrCodeLength: qrCodeDataURL.length,
-        qrCodePreview: qrCodeDataURL.substring(0, 100)
-      }
+      joinURL
     });
   } catch (error) {
     console.error('❌ Error creating queue:', error);
@@ -130,7 +150,7 @@ router.get('/queues/:id/entries', async (req, res) => {
   }
 });
 
-// Call next person in queue
+// Call next person in queue (with email notifications)
 router.post('/queues/:id/call-next', async (req, res) => {
   try {
     const queue = await Queue.findById(req.params.id);
@@ -156,9 +176,19 @@ router.post('/queues/:id/call-next', async (req, res) => {
     queue.currentServingPosition = nextEntry.position;
     await queue.save();
 
+    // Send "It's your turn" email to the called person
+    if (nextEntry.userEmail) {
+      sendYourTurnEmail(nextEntry.userEmail, nextEntry.userName, queue.name)
+        .catch(err => console.error('Your turn email failed:', err));
+    }
+
+    // Notify the next 3 people in queue that their turn is approaching
+    notifyPeopleAhead(req.params.id, queue.name, nextEntry.position, 3);
+
     res.json({
       message: 'Next person called',
-      entry: nextEntry
+      entry: nextEntry,
+      notificationSent: !!nextEntry.userEmail
     });
   } catch (error) {
     console.error('Error calling next person:', error);
@@ -251,16 +281,13 @@ router.get('/queues/:id/qrcode', async (req, res) => {
     }
 
     const joinURL = generateQueueJoinURL(queue._id);
-    console.log('Regenerating QR for URL:', joinURL);
 
     // Always regenerate with new black/white settings
     const qrCodeDataURL = await generateQRCode(joinURL);
-    console.log('New QR generated, length:', qrCodeDataURL.length);
     
     // Update in database
     queue.qrCode = qrCodeDataURL;
     await queue.save();
-    console.log('✅ QR code updated for queue:', queue._id);
 
     res.json({ 
       qrCode: queue.qrCode, 
@@ -268,43 +295,10 @@ router.get('/queues/:id/qrcode', async (req, res) => {
       queueId: queue._id.toString()
     });
   } catch (error) {
-    console.error('Error regenerating QR code:', error);
     res.status(500).json({ 
       message: 'Failed to regenerate QR code',
       error: error.message 
     });
-  }
-});
-
-// 🔍 DEBUG ENDPOINT - Test QR code data
-router.get('/test-qr/:id', async (req, res) => {
-  try {
-    const queue = await Queue.findById(req.params.id);
-    
-    if (!queue) {
-      return res.status(404).json({ message: 'Queue not found' });
-    }
-
-    console.log('=== QR CODE DEBUG ===');
-    console.log('Queue ID:', queue._id);
-    console.log('Queue Name:', queue.name);
-    console.log('QR Code exists:', !!queue.qrCode);
-    console.log('QR Code length:', queue.qrCode ? queue.qrCode.length : 0);
-    console.log('QR Code starts with:', queue.qrCode ? queue.qrCode.substring(0, 50) : 'N/A');
-    console.log('Expected URL:', generateQueueJoinURL(queue._id));
-    
-    res.json({
-      queueId: queue._id,
-      queueName: queue.name,
-      hasQRCode: !!queue.qrCode,
-      qrCodeLength: queue.qrCode ? queue.qrCode.length : 0,
-      qrCodePreview: queue.qrCode ? queue.qrCode.substring(0, 100) : null,
-      expectedJoinURL: generateQueueJoinURL(queue._id),
-      isColorCorrect: queue.qrCode ? queue.qrCode.includes('data:image/png') : false
-    });
-  } catch (error) {
-    console.error('Error in debug endpoint:', error);
-    res.status(500).json({ message: error.message });
   }
 });
 

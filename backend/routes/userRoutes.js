@@ -2,9 +2,14 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const { generateToken } = require('../utils/tokenUtils');
+const { protect } = require('../middleware/authMiddleware');
+const { 
+  validateUserRegistration, 
+  validateLogin 
+} = require('../middleware/validation');
 
 // Register user
-router.post('/register', async (req, res) => {
+router.post('/register', validateUserRegistration, async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
 
@@ -38,7 +43,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login user
-router.post('/login', async (req, res) => {
+router.post('/login', validateLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -61,9 +66,13 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Get user profile
-router.get('/profile/:id', async (req, res) => {
+// Get user profile (protected)
+router.get('/profile/:id', protect, async (req, res) => {
   try {
+    // Users can only view their own profile
+    if (req.user._id.toString() !== req.params.id) {
+      return res.status(403).json({ message: 'Not authorized to view this profile' });
+    }
     const user = await User.findById(req.params.id).select('-password');
     
     if (user) {
@@ -76,8 +85,8 @@ router.get('/profile/:id', async (req, res) => {
   }
 });
 
-// Register admin
-router.post('/admin/register', async (req, res) => {
+// Register admin (with validation)
+router.post('/admin/register', validateUserRegistration, async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
 
@@ -110,8 +119,8 @@ router.post('/admin/register', async (req, res) => {
   }
 });
 
-// Login admin (same as regular login but we'll keep it separate for clarity)
-router.post('/admin/login', async (req, res) => {
+// Login admin (with validation)
+router.post('/admin/login', validateLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
 

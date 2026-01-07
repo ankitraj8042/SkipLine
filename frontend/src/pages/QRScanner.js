@@ -1,10 +1,6 @@
-// ============================================
-// FILE: frontend/src/pages/QRScanner.js
-// FINAL WORKING VERSION
-// ============================================
-
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { showSuccess, showError, showInfo } from '../utils/toast';
 import '../styles/QRScanner.css';
 
 function QRScanner() {
@@ -13,7 +9,6 @@ function QRScanner() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [manualQueueId, setManualQueueId] = useState('');
-  const [debugInfo, setDebugInfo] = useState('');
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
@@ -22,8 +17,6 @@ function QRScanner() {
   // Extract queue ID from the scanned text
   const extractQueueId = (decodedText) => {
     try {
-      console.log('🔍 Processing:', decodedText);
-      
       // Method 1: Parse as URL
       try {
         const url = new URL(decodedText);
@@ -32,36 +25,32 @@ function QRScanner() {
         
         if (queueIndex !== -1 && pathParts[queueIndex + 1]) {
           const queueId = pathParts[queueIndex + 1];
-          console.log('✅ Extracted from URL:', queueId);
           return queueId;
         }
       } catch (e) {
-        console.log('Not a URL, trying other methods...');
+        // Not a URL, try other methods
       }
       
       // Method 2: Direct MongoDB ID (24 hex characters)
       if (/^[a-f0-9]{24}$/i.test(decodedText.trim())) {
-        console.log('✅ Direct ID match:', decodedText.trim());
         return decodedText.trim();
       }
       
       // Method 3: Find MongoDB ID pattern anywhere in text
       const idMatch = decodedText.match(/[a-f0-9]{24}/i);
       if (idMatch) {
-        console.log('✅ Found ID pattern:', idMatch[0]);
         return idMatch[0];
       }
       
       return null;
     } catch (err) {
-      console.error('❌ Extraction error:', err);
       return null;
     }
   };
 
   const handleQRSuccess = (queueId) => {
-    console.log('✅ Navigating to queue:', queueId);
     setSuccess('✅ Success! Redirecting...');
+    showSuccess('QR code scanned successfully!');
     
     // Stop camera if running
     if (videoRef.current && videoRef.current.srcObject) {
@@ -150,12 +139,9 @@ function QRScanner() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('📤 File:', file.name, file.type, file.size);
-
     setError('');
     setSuccess('');
     setUploading(true);
-    setDebugInfo('Reading image...');
 
     try {
       // Load image
@@ -167,9 +153,6 @@ function QRScanner() {
         img.onerror = reject;
         img.src = imageUrl;
       });
-      
-      console.log('📐 Image size:', img.width, 'x', img.height);
-      setDebugInfo('Scanning QR code...');
       
       // Draw to canvas
       const canvas = document.createElement('canvas');
@@ -191,28 +174,23 @@ function QRScanner() {
       URL.revokeObjectURL(imageUrl);
       
       if (code) {
-        console.log('✅ Decoded:', code.data);
-        setDebugInfo(`Found: ${code.data.substring(0, 50)}...`);
-        
         const queueId = extractQueueId(code.data);
         
         if (queueId) {
           handleQRSuccess(queueId);
         } else {
           setError('❌ Could not extract Queue ID from QR code');
-          setDebugInfo(`Data: ${code.data}`);
+          showError('Invalid QR code format');
           setUploading(false);
         }
       } else {
-        console.error('❌ No QR code found in image');
-        setError('❌ No QR code detected. Please try:\n• Better lighting\n• Clearer image\n• Getting closer to QR code\n• Or use manual entry below');
-        setDebugInfo('No QR code found');
+        setError('❌ No QR code detected. Please try a clearer image.');
+        showError('No QR code found in image');
         setUploading(false);
       }
     } catch (err) {
-      console.error('❌ Scan error:', err);
       setError('Failed to process image. Please try again.');
-      setDebugInfo('Processing failed');
+      showError('Failed to process image');
       setUploading(false);
     }
 
@@ -226,10 +204,11 @@ function QRScanner() {
     const id = manualQueueId.trim();
     
     if (id) {
-      console.log('Manual entry:', id);
+      showInfo('Redirecting to queue...');
       navigate(`/queue/${id}/join`);
     } else {
       setError('Please enter a valid Queue ID');
+      showError('Please enter a valid Queue ID');
     }
   };
 
@@ -244,7 +223,6 @@ function QRScanner() {
         {error && <div className="error-message" style={{whiteSpace: 'pre-line'}}>{error}</div>}
         {success && <div className="success-message">{success}</div>}
         {uploading && <div className="info-message">📤 Processing image...</div>}
-        {debugInfo && <div className="info-message" style={{fontSize: '0.85em', marginTop: '8px'}}>🔍 {debugInfo}</div>}
 
         {!scanning ? (
           <div className="scanner-actions">

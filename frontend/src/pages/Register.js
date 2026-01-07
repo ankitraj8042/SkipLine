@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { showSuccess, showError } from '../utils/toast';
 import '../styles/Auth.css';
 
 function Register() {
@@ -25,20 +26,39 @@ function Register() {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    // Validation
+  const validateForm = () => {
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
-      return;
+      showError('Passwords do not match');
+      return false;
     }
 
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
-      return;
+      showError('Password must be at least 6 characters');
+      return false;
     }
+
+    if (!/\d/.test(formData.password)) {
+      setError('Password must contain at least one number');
+      showError('Password must contain at least one number');
+      return false;
+    }
+
+    if (!/^[0-9]{10}$/.test(formData.phone)) {
+      setError('Phone number must be 10 digits');
+      showError('Phone number must be 10 digits');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!validateForm()) return;
 
     setLoading(true);
 
@@ -52,6 +72,7 @@ function Register() {
     const result = await register(userData, role);
     
     if (result.success) {
+      showSuccess('Account created successfully!');
       if (role === 'admin') {
         navigate('/admin/dashboard');
       } else {
@@ -59,6 +80,7 @@ function Register() {
       }
     } else {
       setError(result.message);
+      showError(result.message);
     }
     setLoading(false);
   };

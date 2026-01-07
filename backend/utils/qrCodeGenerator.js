@@ -1,32 +1,22 @@
-// ============================================
-// FILE: backend/utils/qrCodeGenerator.js
-// COMPLETE VERSION WITH BLACK/WHITE FIX
-// ============================================
-
 const QRCode = require('qrcode');
 
 /**
  * Generate QR code as data URL with optimized settings for scanning
- * FIXED: Pure black and white colors for maximum scanability
+ * Pure black and white colors for maximum scanability
  */
 const generateQRCode = async (data) => {
   try {
-    console.log('Generating QR code for:', data);
-    
     const qrCodeDataURL = await QRCode.toDataURL(data, {
-      width: 500,                    // Even larger for better scanning
-      margin: 6,                     // More margin for edge detection
-      errorCorrectionLevel: 'H',     // Highest error correction (30% recovery)
+      width: 500,
+      margin: 6,
+      errorCorrectionLevel: 'H',
       color: {
-        dark: '#000000',             // PURE BLACK (not blue!)
-        light: '#FFFFFF'             // PURE WHITE
+        dark: '#000000',
+        light: '#FFFFFF'
       },
       type: 'image/png',
-      quality: 1.0                   // Maximum quality
+      quality: 1.0
     });
-    
-    console.log('QR code generated successfully');
-    console.log('First 100 chars of QR data:', qrCodeDataURL.substring(0, 100));
     
     return qrCodeDataURL;
   } catch (error) {
@@ -45,7 +35,6 @@ const generateQueueJoinURL = (queueId, baseURL) => {
   
   const cleanURL = frontendURL.replace(/\/$/, '');
   const joinURL = `${cleanURL}/queue/${queueId}/join`;
-  console.log('Generated join URL:', joinURL);
   
   return joinURL;
 };
@@ -55,8 +44,6 @@ const generateQueueJoinURL = (queueId, baseURL) => {
  */
 const generateSimpleQRCode = async (queueId) => {
   try {
-    console.log('Generating simple QR code for queue ID:', queueId);
-    
     const qrCodeDataURL = await QRCode.toDataURL(queueId.toString(), {
       width: 500,
       margin: 6,
@@ -69,7 +56,6 @@ const generateSimpleQRCode = async (queueId) => {
       quality: 1.0
     });
     
-    console.log('Simple QR code generated successfully');
     return qrCodeDataURL;
   } catch (error) {
     console.error('Error generating simple QR code:', error);

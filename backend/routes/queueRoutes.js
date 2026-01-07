@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Queue = require('../models/Queue');
 const QueueEntry = require('../models/QueueEntry');
+const { validateJoinQueue, validateObjectId } = require('../middleware/validation');
+const { sendQueueJoinedEmail } = require('../services/emailService');
 
 // Get all active queues
 router.get('/', async (req, res) => {
@@ -14,7 +16,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get queue by ID with all entries
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateObjectId, async (req, res) => {
   try {
     const queue = await Queue.findById(req.params.id);
     if (!queue) {
@@ -30,8 +32,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Join a queue
-router.post('/:id/join', async (req, res) => {
+// Join a queue (with validation and email notification)
+router.post('/:id/join', validateJoinQueue, async (req, res) => {
   try {
     const { userName, userPhone, userEmail, notes } = req.body;
 
@@ -42,6 +44,20 @@ router.post('/:id/join', async (req, res) => {
 
     if (!queue.isActive) {
       return res.status(400).json({ message: 'Queue is not active' });
+    }
+
+    // Check if user is already in this queue
+    const existingEntry = await QueueEntry.findOne({
+      queueId: req.params.id,
+      userPhone,
+      status: { $in: ['waiting', 'called'] }
+    });
+
+    if (existingEntry) {
+      return res.status(400).json({ 
+        message: 'You are already in this queue',
+        entry: existingEntry
+      });
     }
 
     // Get the last position in queue
@@ -75,10 +91,17 @@ router.post('/:id/join', async (req, res) => {
 
     await newEntry.save();
 
+    // Send confirmation email (non-blocking)
+    if (userEmail) {
+      sendQueueJoinedEmail(userEmail, userName, queue.name, newPosition, estimatedWaitTime)
+        .catch(err => console.error('Email sending failed:', err));
+    }
+
     res.status(201).json({
       message: 'Successfully joined the queue',
       entry: newEntry,
-      queueName: queue.name
+      queueName: queue.name,
+      estimatedWaitTime
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

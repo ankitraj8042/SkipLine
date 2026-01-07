@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { queueAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { showSuccess, showError, showInfo } from '../utils/toast';
+import { requestNotificationPermission } from '../utils/pushNotifications';
 import '../styles/JoinQueue.css';
 
 function JoinQueue() {
@@ -16,6 +18,8 @@ function JoinQueue() {
 
   useEffect(() => {
     fetchQueue();
+    // Request notification permission early
+    requestNotificationPermission();
   }, [id]);
 
   const fetchQueue = async () => {
@@ -25,6 +29,7 @@ function JoinQueue() {
       setError('');
     } catch (err) {
       setError('Failed to load queue details.');
+      showError('Failed to load queue details');
     } finally {
       setLoading(false);
     }
@@ -54,9 +59,14 @@ function JoinQueue() {
         queueName: result.queueName
       }));
       
+      showSuccess(`Successfully joined ${result.queueName}! Position #${result.entry.position}`);
+      showInfo(`Estimated wait: ~${result.estimatedWaitTime || result.entry.estimatedWaitTime} minutes`);
+      
       navigate('/user/my-queue');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to join queue. Please try again.');
+      const errorMsg = err.response?.data?.message || 'Failed to join queue. Please try again.';
+      setError(errorMsg);
+      showError(errorMsg);
     } finally {
       setSubmitting(false);
     }

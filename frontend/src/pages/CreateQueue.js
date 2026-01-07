@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../services/api';
+import { showSuccess, showError } from '../utils/toast';
 import '../styles/CreateQueue.css';
 
 function CreateQueue() {
@@ -8,7 +9,7 @@ function CreateQueue() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    organizationType: 'clinic',
+    organizationType: 'shop',
     maxCapacity: 50,
     estimatedTimePerPerson: 5,
     organizerName: '',
@@ -31,10 +32,12 @@ function CreateQueue() {
 
     try {
       const result = await adminAPI.createQueue(formData);
-      alert('Queue created successfully!');
+      showSuccess('Queue created successfully!');
       navigate(`/admin/manage/${result.queue._id}`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create queue');
+      const errorMsg = err.response?.data?.message || 'Failed to create queue';
+      setError(errorMsg);
+      showError(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -83,10 +86,14 @@ function CreateQueue() {
                 onChange={handleChange}
                 required
               >
-                <option value="clinic">Clinic</option>
-                <option value="shop">Shop</option>
-                <option value="college">College</option>
-                <option value="other">Other</option>
+                <option value="shop">🛍️ Shop / Retail Store</option>
+                <option value="restaurant">🍽️ Restaurant / Cafe</option>
+                <option value="clinic">🏥 Clinic / Hospital</option>
+                <option value="bank">🏦 Bank / Financial</option>
+                <option value="salon">💇 Salon / Spa</option>
+                <option value="government">🏛️ Government Office</option>
+                <option value="college">🎓 College / Educational</option>
+                <option value="other">📋 Other</option>
               </select>
             </div>
 

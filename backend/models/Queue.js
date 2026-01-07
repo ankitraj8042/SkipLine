@@ -12,7 +12,7 @@ const queueSchema = new mongoose.Schema({
   },
   organizationType: {
     type: String,
-    enum: ['clinic', 'shop', 'college', 'other'],
+    enum: ['clinic', 'shop', 'college', 'restaurant', 'bank', 'government', 'salon', 'other'],
     required: true
   },
   isActive: {

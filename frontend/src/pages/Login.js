@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { showSuccess, showError } from '../utils/toast';
 import '../styles/Auth.css';
 
 function Login() {
@@ -30,6 +31,7 @@ function Login() {
     const result = await login(formData.email, formData.password, role);
     
     if (result.success) {
+      showSuccess('Login successful!');
       if (role === 'admin') {
         navigate('/admin/dashboard');
       } else {
@@ -37,6 +39,7 @@ function Login() {
       }
     } else {
       setError(result.message);
+      showError(result.message);
     }
     setLoading(false);
   };

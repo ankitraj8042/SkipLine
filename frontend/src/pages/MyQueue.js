@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { queueAPI } from '../services/api';
+import { showSuccess, showError, showYourTurn, showTurnApproaching } from '../utils/toast';
+import { requestNotificationPermission, showBrowserNotification } from '../utils/pushNotifications';
 import '../styles/MyQueue.css';
 
 function MyQueue() {
@@ -8,6 +10,82 @@ function MyQueue() {
   const [error, setError] = useState('');
   const [phone, setPhone] = useState('');
   const [queueId, setQueueId] = useState('');
+  const [lastStatus, setLastStatus] = useState(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const audioRef = useRef(null);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    const setupNotifications = async () => {
+      const granted = await requestNotificationPermission();
+      setNotificationsEnabled(granted);
+    };
+    setupNotifications();
+  }, []);
+
+  // Play notification sound
+  const playNotificationSound = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(() => {});
+    }
+  }, []);
+
+  // Check for status changes and notify
+  const checkAndNotify = useCallback((newData) => {
+    if (!lastStatus) {
+      setLastStatus(newData);
+      return;
+    }
+
+    const { entry, peopleAhead } = newData;
+    const prevEntry = lastStatus.entry;
+    
+    // Status changed to "called" - IT'S YOUR TURN!
+    if (prevEntry.status === 'waiting' && entry.status === 'called') {
+      playNotificationSound();
+      showYourTurn(newData.queue.name);
+      
+      // Browser notification
+      if (notificationsEnabled) {
+        showBrowserNotification('🔔 IT\'S YOUR TURN!', {
+          body: `Please proceed to ${newData.queue.name} immediately!`,
+          requireInteraction: true,
+          tag: 'your-turn'
+        });
+      }
+    }
+    
+    // People ahead decreased significantly (turn approaching)
+    if (prevEntry.status === 'waiting' && entry.status === 'waiting') {
+      if (lastStatus.peopleAhead > 3 && peopleAhead <= 3 && peopleAhead > 0) {
+        showTurnApproaching(entry.position, peopleAhead);
+        
+        if (notificationsEnabled) {
+          showBrowserNotification('⏰ Your turn is approaching!', {
+            body: `${peopleAhead} ${peopleAhead === 1 ? 'person' : 'people'} ahead of you`,
+            tag: 'turn-approaching'
+          });
+        }
+      }
+    }
+
+    setLastStatus(newData);
+  }, [lastStatus, notificationsEnabled, playNotificationSound]);
+
+  const fetchQueueStatus = useCallback(async (qId, ph) => {
+    try {
+      setLoading(true);
+      const data = await queueAPI.getPosition(qId, ph);
+      setQueueStatus(data);
+      checkAndNotify(data);
+      setError('');
+    } catch (err) {
+      setError('Could not find your position in queue.');
+      localStorage.removeItem('currentQueueEntry');
+    } finally {
+      setLoading(false);
+    }
+  }, [checkAndNotify]);
 
   useEffect(() => {
     // Check if user has a saved queue entry
@@ -22,19 +100,20 @@ function MyQueue() {
     }
   }, []);
 
-  const fetchQueueStatus = async (qId, ph) => {
-    try {
-      setLoading(true);
-      const data = await queueAPI.getPosition(qId, ph);
-      setQueueStatus(data);
-      setError('');
-    } catch (err) {
-      setError('Could not find your position in queue.');
-      localStorage.removeItem('currentQueueEntry');
-    } finally {
-      setLoading(false);
+  // Auto-refresh every 10 seconds when in queue
+  useEffect(() => {
+    if (queueStatus && queueStatus.entry.status === 'waiting') {
+      const interval = setInterval(() => {
+        const savedEntry = localStorage.getItem('currentQueueEntry');
+        if (savedEntry) {
+          const entry = JSON.parse(savedEntry);
+          fetchQueueStatus(entry.queueId, entry.phone);
+        }
+      }, 10000); // Refresh every 10 seconds
+      
+      return () => clearInterval(interval);
     }
-  };
+  }, [queueStatus, fetchQueueStatus]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -53,9 +132,9 @@ function MyQueue() {
       await queueAPI.cancelEntry(savedEntry.queueId, savedEntry.entryId);
       localStorage.removeItem('currentQueueEntry');
       setQueueStatus(null);
-      alert('Queue entry cancelled successfully');
+      showSuccess('Queue entry cancelled successfully');
     } catch (err) {
-      alert('Failed to cancel entry. Please try again.');
+      showError('Failed to cancel entry. Please try again.');
     }
   };
 
@@ -135,8 +214,31 @@ function MyQueue() {
 
   return (
     <div className="my-queue-page">
+      {/* Hidden audio for notification sound */}
+      <audio ref={audioRef} preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdnmFl5ycl4+GdWBRTl5tjJOVlpWSlY2FbFhLSldocIKRmZWQioV+b11TS0xUY3KDlJuXk42HfXBgUklKVWZ2h5aZlpKMhn1xX09HSlVld4iYnJiTjoeDdWNUSkVQYXKFl5yXko2Jf3FfUkhHU2V2iJedmJKNiIF1Y1NJRlFjdIiYnZeTjoqBcmBQR0dTZneJmZ2Xk42JgXJgT0dIVGd4iZqdl5ONiIF0YU9HR1RneImbnpeTjIl/cV9PR0hVaHmKnJ6XkoyJfnBeT0dIVWl6i5ydlpKMiH5wXk9ISFUAAIA/AABAQAAAQEAAAEBAAABAQAAAQD8AAEA/AABAPwAAQD8AAAA/AAAAPwAAAD8AAAA/" type="audio/wav"/>
+      </audio>
+      
       <div className="my-queue-container">
         <div className="status-main-card">
+          {/* Notification permission banner */}
+          {!notificationsEnabled && (
+            <div className="notification-banner">
+              <span>🔔</span>
+              <p>Enable notifications to get alerted when it's your turn!</p>
+              <button 
+                onClick={async () => {
+                  const granted = await requestNotificationPermission();
+                  setNotificationsEnabled(granted);
+                  if (granted) showSuccess('Notifications enabled!');
+                }}
+                className="btn btn-small"
+              >
+                Enable
+              </button>
+            </div>
+          )}
+
           <div className="status-header">
             <h1>{queue.name}</h1>
             <span className={`status-badge-large ${entry.status}`}>
