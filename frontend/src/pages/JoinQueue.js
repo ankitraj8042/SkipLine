@@ -17,23 +17,23 @@ function JoinQueue() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchQueue();
+    const fetchQueueData = async () => {
+      try {
+        const data = await queueAPI.getQueueById(id);
+        setQueue(data.queue);
+        setError('');
+      } catch (err) {
+        setError('Failed to load queue details.');
+        showError('Failed to load queue details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchQueueData();
     // Request notification permission early
     requestNotificationPermission();
   }, [id]);
-
-  const fetchQueue = async () => {
-    try {
-      const data = await queueAPI.getQueueById(id);
-      setQueue(data.queue);
-      setError('');
-    } catch (err) {
-      setError('Failed to load queue details.');
-      showError('Failed to load queue details');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();

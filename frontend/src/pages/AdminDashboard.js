@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { queueAPI } from '../services/api';
+import { adminAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Dashboard.css';
 
@@ -15,7 +15,7 @@ function AdminDashboard() {
 
   const fetchQueues = async () => {
     try {
-      const data = await queueAPI.getAllQueues();
+      const data = await adminAPI.getAllQueues();
       setQueues(data);
     } catch (err) {
       console.error('Failed to fetch queues:', err);

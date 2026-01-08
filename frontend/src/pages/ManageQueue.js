@@ -11,12 +11,28 @@ function ManageQueue() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadPreview, setUploadPreview] = useState(null);
 
   useEffect(() => {
-    fetchQueueData();
-    const interval = setInterval(fetchQueueData, 5000);
+    const fetchData = async () => {
+      try {
+        const [queueData, entriesData, statsData] = await Promise.all([
+          queueAPI.getQueueById(id),
+          adminAPI.getQueueEntries(id),
+          adminAPI.getQueueStats(id)
+        ]);
+        
+        setQueue(queueData.queue);
+        setEntries(entriesData);
+        setStats(statsData.stats);
+      } catch (err) {
+        console.error('Failed to fetch queue data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, [id]);
 
@@ -192,6 +208,9 @@ function ManageQueue() {
           <div className="qr-actions">
             <button onClick={handleDownloadQR} className="btn btn-primary">
               💾 Download QR Code
+            </button>
+            <button onClick={handlePrintQR} className="btn btn-secondary">
+              🖨️ Print QR Code
             </button>
             <button 
               onClick={() => {

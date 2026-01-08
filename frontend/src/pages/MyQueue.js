@@ -98,7 +98,7 @@ function MyQueue() {
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [fetchQueueStatus]);
 
   // Auto-refresh every 10 seconds when in queue
   useEffect(() => {

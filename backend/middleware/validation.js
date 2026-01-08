@@ -4,8 +4,9 @@ const { body, param, validationResult } = require('express-validator');
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const errorMessages = errors.array().map(err => err.msg);
     return res.status(400).json({
-      message: 'Validation failed',
+      message: errorMessages[0], // Return first error as main message
       errors: errors.array().map(err => ({
         field: err.path,
         message: err.msg
@@ -68,7 +69,7 @@ const validateQueueCreation = [
   
   body('organizationType')
     .notEmpty().withMessage('Organization type is required')
-    .isIn(['clinic', 'shop', 'college', 'restaurant', 'bank', 'government', 'other'])
+    .isIn(['clinic', 'shop', 'college', 'restaurant', 'bank', 'government', 'salon', 'other'])
     .withMessage('Invalid organization type'),
   
   body('maxCapacity')

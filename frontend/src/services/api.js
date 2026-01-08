@@ -84,6 +84,12 @@ export const queueAPI = {
 
 // Admin API calls
 export const adminAPI = {
+  // Get all queues (including inactive)
+  getAllQueues: async () => {
+    const response = await axios.get(`${API_URL}/admin/queues`);
+    return response.data;
+  },
+
   // Create queue
   createQueue: async (queueData) => {
     const response = await axios.post(`${API_URL}/admin/queues`, queueData);
@@ -145,8 +151,10 @@ export const adminAPI = {
   }
 };
 
-export default {
+const apiExports = {
   authAPI,
   queueAPI,
   adminAPI
 };
+
+export default apiExports;

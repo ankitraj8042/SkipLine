@@ -103,7 +103,7 @@ export const showPromise = (promise, messages) => {
   });
 };
 
-export default {
+const toastUtils = {
   showSuccess,
   showError,
   showInfo,
@@ -112,3 +112,5 @@ export default {
   showTurnApproaching,
   showPromise,
 };
+
+export default toastUtils;

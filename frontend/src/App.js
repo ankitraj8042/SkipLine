@@ -4,7 +4,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 import { AuthProvider } from './context/AuthContext';
-import { ProtectedRoute, UserRoute, AdminRoute } from './components/ProtectedRoute';
+import { UserRoute, AdminRoute } from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import ErrorBoundary from './components/ErrorBoundary';
 

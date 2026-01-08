@@ -43,6 +43,20 @@ const notifyPeopleAhead = async (queueId, queueName, currentPosition, notifyCoun
   }
 };
 
+// Get all queues (including inactive) for admin dashboard
+router.get('/queues', async (req, res) => {
+  try {
+    const queues = await Queue.find().sort({ createdAt: -1 });
+    res.json(queues);
+  } catch (error) {
+    console.error('Error fetching queues:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch queues',
+      error: error.message 
+    });
+  }
+});
+
 // Create a new queue (with validation)
 router.post('/queues', validateQueueCreation, async (req, res) => {
   try {
