@@ -1,8 +1,3 @@
-// ============================================
-// FILE: backend/routes/adminRoutes.js
-// WITH NOTIFICATIONS AND VALIDATION
-// ============================================
-
 const express = require('express');
 const router = express.Router();
 const Queue = require('../models/Queue');
@@ -15,6 +10,27 @@ const { sendYourTurnEmail, sendTurnApproachingEmail } = require('../services/ema
 // Apply authentication and admin middleware to all routes
 router.use(protect);
 router.use(admin);
+
+// Helper middleware to verify queue ownership
+const verifyQueueOwnership = async (req, res, next) => {
+  try {
+    const queueId = req.params.id || req.params.queueId;
+    const queue = await Queue.findById(queueId);
+    
+    if (!queue) {
+      return res.status(404).json({ message: 'Queue not found' });
+    }
+    
+    if (queue.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to access this queue' });
+    }
+    
+    req.queue = queue;
+    next();
+  } catch (error) {
+    res.status(500).json({ message: 'Error verifying queue ownership' });
+  }
+};
 
 // Helper function to notify people ahead
 const notifyPeopleAhead = async (queueId, queueName, currentPosition, notifyCount = 3) => {
@@ -46,7 +62,8 @@ const notifyPeopleAhead = async (queueId, queueName, currentPosition, notifyCoun
 // Get all queues (including inactive) for admin dashboard
 router.get('/queues', async (req, res) => {
   try {
-    const queues = await Queue.find().sort({ createdAt: -1 });
+    // Show only queues created by this admin
+    const queues = await Queue.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
     res.json(queues);
   } catch (error) {
     res.status(500).json({ 
@@ -76,7 +93,8 @@ router.post('/queues', validateQueueCreation, async (req, res) => {
       maxCapacity,
       estimatedTimePerPerson,
       organizerName,
-      organizerEmail
+      organizerEmail,
+      createdBy: req.user._id
     });
 
     await queue.save();
@@ -104,15 +122,19 @@ router.post('/queues', validateQueueCreation, async (req, res) => {
 // Update queue
 router.put('/queues/:id', async (req, res) => {
   try {
-    const queue = await Queue.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
+    const queue = await Queue.findById(req.params.id);
 
     if (!queue) {
       return res.status(404).json({ message: 'Queue not found' });
     }
+
+    // Verify ownership
+    if (queue.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to update this queue' });
+    }
+
+    Object.assign(queue, req.body);
+    await queue.save();
 
     res.json({ message: 'Queue updated successfully', queue });
   } catch (error) {
@@ -132,6 +154,11 @@ router.delete('/queues/:id', async (req, res) => {
       return res.status(404).json({ message: 'Queue not found' });
     }
 
+    // Verify ownership
+    if (queue.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to delete this queue' });
+    }
+
     queue.isActive = false;
     await queue.save();
 
@@ -145,7 +172,7 @@ router.delete('/queues/:id', async (req, res) => {
 });
 
 // Get all entries for a queue
-router.get('/queues/:id/entries', async (req, res) => {
+router.get('/queues/:id/entries', verifyQueueOwnership, async (req, res) => {
   try {
     const entries = await QueueEntry.find({ queueId: req.params.id })
       .sort({ position: 1 });
@@ -160,13 +187,9 @@ router.get('/queues/:id/entries', async (req, res) => {
 });
 
 // Call next person in queue (with email notifications)
-router.post('/queues/:id/call-next', async (req, res) => {
+router.post('/queues/:id/call-next', verifyQueueOwnership, async (req, res) => {
   try {
-    const queue = await Queue.findById(req.params.id);
-    
-    if (!queue) {
-      return res.status(404).json({ message: 'Queue not found' });
-    }
+    const queue = req.queue;
 
     const nextEntry = await QueueEntry.findOne({
       queueId: req.params.id,
@@ -247,7 +270,6 @@ router.post('/entries/:id/missed', async (req, res) => {
 
     res.json({ message: 'Entry marked as missed', entry });
   } catch (error) {
-    console.error('Error marking entry as missed:', error);
     res.status(500).json({ 
       message: 'Failed to mark entry as missed',
       error: error.message 
@@ -270,7 +292,6 @@ router.post('/entries/:id/skip-to', async (req, res) => {
 
     res.json({ message: 'Skipped to entry', entry });
   } catch (error) {
-    console.error('Error skipping to entry:', error);
     res.status(500).json({ 
       message: 'Failed to skip to entry',
       error: error.message 
@@ -279,13 +300,9 @@ router.post('/entries/:id/skip-to', async (req, res) => {
 });
 
 // Regenerate QR code for a queue
-router.get('/queues/:id/qrcode', async (req, res) => {
+router.get('/queues/:id/qrcode', verifyQueueOwnership, async (req, res) => {
   try {
-    const queue = await Queue.findById(req.params.id);
-    
-    if (!queue) {
-      return res.status(404).json({ message: 'Queue not found' });
-    }
+    const queue = req.queue;
 
     const joinURL = generateQueueJoinURL(queue._id);
 
@@ -310,13 +327,9 @@ router.get('/queues/:id/qrcode', async (req, res) => {
 });
 
 // Get queue statistics
-router.get('/queues/:id/stats', async (req, res) => {
+router.get('/queues/:id/stats', verifyQueueOwnership, async (req, res) => {
   try {
-    const queue = await Queue.findById(req.params.id);
-    
-    if (!queue) {
-      return res.status(404).json({ message: 'Queue not found' });
-    }
+    const queue = req.queue;
 
     const totalWaiting = await QueueEntry.countDocuments({
       queueId: req.params.id,
@@ -349,7 +362,6 @@ router.get('/queues/:id/stats', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching stats:', error);
     res.status(500).json({ 
       message: 'Failed to fetch statistics',
       error: error.message 
@@ -358,13 +370,9 @@ router.get('/queues/:id/stats', async (req, res) => {
 });
 
 // Download QR code as PNG file
-router.get('/queues/:id/qrcode/download', async (req, res) => {
+router.get('/queues/:id/qrcode/download', verifyQueueOwnership, async (req, res) => {
   try {
-    const queue = await Queue.findById(req.params.id);
-    
-    if (!queue) {
-      return res.status(404).json({ message: 'Queue not found' });
-    }
+    const queue = req.queue;
 
     if (queue.qrCode) {
       const base64Data = queue.qrCode.replace(/^data:image\/png;base64,/, '');
@@ -380,7 +388,6 @@ router.get('/queues/:id/qrcode/download', async (req, res) => {
       res.status(404).json({ message: 'QR code not found for this queue' });
     }
   } catch (error) {
-    console.error('Error downloading QR code:', error);
     res.status(500).json({ 
       message: 'Failed to download QR code',
       error: error.message 
