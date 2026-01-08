@@ -69,10 +69,6 @@ const sendTurnApproachingEmail = async (userEmail, userName, queueName, position
   };
 
   if (!transporter) {
-    console.log('📧 [DEV MODE] Email notification:');
-    console.log(`   To: ${userEmail}`);
-    console.log(`   Subject: ${mailContent.subject}`);
-    console.log(`   Message: ${userName}, your turn is approaching! Position #${position}, ${peopleAhead} people ahead.`);
     return { success: true, mode: 'dev' };
   }
 
@@ -83,10 +79,8 @@ const sendTurnApproachingEmail = async (userEmail, userName, queueName, position
       subject: mailContent.subject,
       html: mailContent.html
     });
-    console.log(`✅ Email sent to ${userEmail}`);
     return { success: true };
   } catch (error) {
-    console.error(`❌ Failed to send email to ${userEmail}:`, error.message);
     return { success: false, error: error.message };
   }
 };
@@ -142,9 +136,6 @@ const sendYourTurnEmail = async (userEmail, userName, queueName) => {
   };
 
   if (!transporter) {
-    console.log('📧 [DEV MODE] YOUR TURN Email:');
-    console.log(`   To: ${userEmail}`);
-    console.log(`   Message: ${userName}, IT'S YOUR TURN in ${queueName}! Proceed immediately.`);
     return { success: true, mode: 'dev' };
   }
 
@@ -155,10 +146,8 @@ const sendYourTurnEmail = async (userEmail, userName, queueName) => {
       subject: mailContent.subject,
       html: mailContent.html
     });
-    console.log(`✅ YOUR TURN email sent to ${userEmail}`);
     return { success: true };
   } catch (error) {
-    console.error(`❌ Failed to send YOUR TURN email:`, error.message);
     return { success: false, error: error.message };
   }
 };
@@ -215,9 +204,6 @@ const sendQueueJoinedEmail = async (userEmail, userName, queueName, position, es
   };
 
   if (!transporter) {
-    console.log('📧 [DEV MODE] Queue Joined Email:');
-    console.log(`   To: ${userEmail}`);
-    console.log(`   Message: ${userName} joined ${queueName} at position #${position}`);
     return { success: true, mode: 'dev' };
   }
 
@@ -228,10 +214,8 @@ const sendQueueJoinedEmail = async (userEmail, userName, queueName, position, es
       subject: mailContent.subject,
       html: mailContent.html
     });
-    console.log(`✅ Queue joined email sent to ${userEmail}`);
     return { success: true };
   } catch (error) {
-    console.error(`❌ Failed to send queue joined email:`, error.message);
     return { success: false, error: error.message };
   }
 };

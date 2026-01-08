@@ -116,7 +116,6 @@ function QRScanner() {
         videoRef.current.scanInterval = scanInterval;
       }
     } catch (err) {
-      console.error('Camera error:', err);
       setError('Could not access camera. Please check permissions.');
       setScanning(false);
     }

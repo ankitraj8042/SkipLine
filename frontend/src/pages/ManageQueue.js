@@ -25,7 +25,7 @@ function ManageQueue() {
         setEntries(entriesData);
         setStats(statsData.stats);
       } catch (err) {
-        console.error('Failed to fetch queue data:', err);
+        // Error handled silently
       } finally {
         setLoading(false);
       }
@@ -48,7 +48,7 @@ function ManageQueue() {
       setEntries(entriesData);
       setStats(statsData.stats);
     } catch (err) {
-      console.error('Failed to fetch queue data:', err);
+      // Error handled silently
     } finally {
       setLoading(false);
     }

@@ -1,18 +1,11 @@
 const webpush = require('web-push');
 
-// Generate VAPID keys (run once and save to .env)
-// const vapidKeys = webpush.generateVAPIDKeys();
-// console.log('Public Key:', vapidKeys.publicKey);
-// console.log('Private Key:', vapidKeys.privateKey);
-
 // Configure web-push with VAPID keys
 const initializePushNotifications = () => {
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   
   if (!publicKey || !privateKey) {
-    console.log('⚠️ VAPID keys not configured. Push notifications disabled.');
-    console.log('   Run: node -e "const wp = require(\'web-push\'); const k = wp.generateVAPIDKeys(); console.log(k)"');
     return false;
   }
 
@@ -22,7 +15,6 @@ const initializePushNotifications = () => {
     privateKey
   );
   
-  console.log('✅ Push notifications initialized');
   return true;
 };
 
@@ -34,7 +26,6 @@ const subscriptions = new Map();
  */
 const saveSubscription = (userId, subscription) => {
   subscriptions.set(userId, subscription);
-  console.log(`📱 Push subscription saved for user: ${userId}`);
   return true;
 };
 
@@ -43,7 +34,6 @@ const saveSubscription = (userId, subscription) => {
  */
 const removeSubscription = (userId) => {
   subscriptions.delete(userId);
-  console.log(`📱 Push subscription removed for user: ${userId}`);
 };
 
 /**
@@ -53,17 +43,13 @@ const sendPushNotification = async (userId, payload) => {
   const subscription = subscriptions.get(userId);
   
   if (!subscription) {
-    console.log(`⚠️ No push subscription found for user: ${userId}`);
     return { success: false, reason: 'No subscription' };
   }
 
   try {
     await webpush.sendNotification(subscription, JSON.stringify(payload));
-    console.log(`✅ Push notification sent to user: ${userId}`);
     return { success: true };
   } catch (error) {
-    console.error(`❌ Push notification failed for user ${userId}:`, error.message);
-    
     // Remove invalid subscriptions
     if (error.statusCode === 410) {
       removeSubscription(userId);

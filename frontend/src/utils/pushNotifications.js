@@ -10,7 +10,6 @@ export const isPushSupported = () => {
 // Request notification permission
 export const requestNotificationPermission = async () => {
   if (!isPushSupported()) {
-    console.log('Push notifications not supported');
     return false;
   }
 
@@ -18,7 +17,6 @@ export const requestNotificationPermission = async () => {
     const permission = await Notification.requestPermission();
     return permission === 'granted';
   } catch (error) {
-    console.error('Error requesting notification permission:', error);
     return false;
   }
 };
@@ -29,7 +27,6 @@ export const getVapidPublicKey = async () => {
     const response = await axios.get(`${API_URL}/notifications/vapid-public-key`);
     return response.data;
   } catch (error) {
-    console.error('Failed to get VAPID key:', error);
     return { available: false };
   }
 };
@@ -71,10 +68,8 @@ export const subscribeToPush = async () => {
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    console.log('Push notification subscription successful');
     return { success: true };
   } catch (error) {
-    console.error('Push subscription error:', error);
     return { success: false, reason: error.message };
   }
 };
@@ -98,7 +93,6 @@ export const unsubscribeFromPush = async () => {
     
     return { success: true };
   } catch (error) {
-    console.error('Push unsubscribe error:', error);
     return { success: false, reason: error.message };
   }
 };

@@ -36,7 +36,6 @@ router.post('/subscribe', protect, async (req, res) => {
       message: 'Successfully subscribed to push notifications' 
     });
   } catch (error) {
-    console.error('Push subscription error:', error);
     res.status(500).json({ message: 'Failed to save subscription' });
   }
 });
@@ -50,7 +49,6 @@ router.post('/unsubscribe', protect, async (req, res) => {
       message: 'Successfully unsubscribed from push notifications' 
     });
   } catch (error) {
-    console.error('Push unsubscribe error:', error);
     res.status(500).json({ message: 'Failed to unsubscribe' });
   }
 });

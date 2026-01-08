@@ -94,7 +94,7 @@ router.post('/:id/join', validateJoinQueue, async (req, res) => {
     // Send confirmation email (non-blocking)
     if (userEmail) {
       sendQueueJoinedEmail(userEmail, userName, queue.name, newPosition, estimatedWaitTime)
-        .catch(err => console.error('Email sending failed:', err));
+        .catch(() => {});
     }
 
     res.status(201).json({

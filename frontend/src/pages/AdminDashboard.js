@@ -18,7 +18,7 @@ function AdminDashboard() {
       const data = await adminAPI.getAllQueues();
       setQueues(data);
     } catch (err) {
-      console.error('Failed to fetch queues:', err);
+      // Error handled silently
     } finally {
       setLoading(false);
     }

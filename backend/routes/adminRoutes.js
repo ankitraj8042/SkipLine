@@ -35,11 +35,11 @@ const notifyPeopleAhead = async (queueId, queueName, currentPosition, notifyCoun
           queueName, 
           entry.position, 
           peopleAhead
-        ).catch(err => console.error('Notification failed:', err));
+        ).catch(() => {});
       }
     }
   } catch (error) {
-    console.error('Error notifying people ahead:', error);
+    // Error handled silently
   }
 };
 
@@ -49,7 +49,6 @@ router.get('/queues', async (req, res) => {
     const queues = await Queue.find().sort({ createdAt: -1 });
     res.json(queues);
   } catch (error) {
-    console.error('Error fetching queues:', error);
     res.status(500).json({ 
       message: 'Failed to fetch queues',
       error: error.message 
@@ -95,7 +94,6 @@ router.post('/queues', validateQueueCreation, async (req, res) => {
       joinURL
     });
   } catch (error) {
-    console.error('❌ Error creating queue:', error);
     res.status(500).json({ 
       message: 'Failed to create queue',
       error: error.message 
@@ -118,7 +116,6 @@ router.put('/queues/:id', async (req, res) => {
 
     res.json({ message: 'Queue updated successfully', queue });
   } catch (error) {
-    console.error('Error updating queue:', error);
     res.status(500).json({ 
       message: 'Failed to update queue',
       error: error.message 
@@ -140,7 +137,6 @@ router.delete('/queues/:id', async (req, res) => {
 
     res.json({ message: 'Queue deactivated successfully' });
   } catch (error) {
-    console.error('Error deactivating queue:', error);
     res.status(500).json({ 
       message: 'Failed to deactivate queue',
       error: error.message 
@@ -156,7 +152,6 @@ router.get('/queues/:id/entries', async (req, res) => {
 
     res.json(entries);
   } catch (error) {
-    console.error('Error fetching entries:', error);
     res.status(500).json({ 
       message: 'Failed to fetch entries',
       error: error.message 
@@ -193,7 +188,7 @@ router.post('/queues/:id/call-next', async (req, res) => {
     // Send "It's your turn" email to the called person
     if (nextEntry.userEmail) {
       sendYourTurnEmail(nextEntry.userEmail, nextEntry.userName, queue.name)
-        .catch(err => console.error('Your turn email failed:', err));
+        .catch(() => {});
     }
 
     // Notify the next 3 people in queue that their turn is approaching
@@ -205,7 +200,6 @@ router.post('/queues/:id/call-next', async (req, res) => {
       notificationSent: !!nextEntry.userEmail
     });
   } catch (error) {
-    console.error('Error calling next person:', error);
     res.status(500).json({ 
       message: 'Failed to call next person',
       error: error.message 
@@ -232,7 +226,6 @@ router.post('/entries/:id/served', async (req, res) => {
 
     res.json({ message: 'Entry marked as served', entry });
   } catch (error) {
-    console.error('Error marking entry as served:', error);
     res.status(500).json({ 
       message: 'Failed to mark entry as served',
       error: error.message 
